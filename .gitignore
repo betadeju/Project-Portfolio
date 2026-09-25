@@ -19,3 +19,8 @@ logs/
 dbt_packages/
 dbt_modules/
 target/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
