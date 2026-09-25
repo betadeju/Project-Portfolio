@@ -1,4 +1,5 @@
-# Weather Data Pipeline
+# Modern Data Stack
+# Weather Data Pipeline (Two-Tier (Data Lake + Data Warehouse) architecture)
 
 An end-to-end batch pipeline that ingests daily weather observations from the NOAA API, lands them in a raw storage layer, models them through a bronze → silver → gold architecture with dbt, and surfaces analytics-ready tables in a warehouse — with idempotent backfills, data quality tests, and CI on every PR.
 
