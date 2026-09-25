@@ -1,0 +1,30 @@
+version: 2
+
+models:
+  - name: stg_observations
+    description: >
+      Cleaned, deduplicated weather observations. One row per
+      station/date/datatype, keeping only the latest ingested version of
+      each reading.
+    columns:
+      - name: station_id
+        tests:
+          - not_null
+      - name: observation_date
+        tests:
+          - not_null
+      - name: datatype
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['TMAX', 'TMIN', 'PRCP', 'SNOW']
+      - name: reading_value
+        tests:
+          - not_null
+
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - station_id
+            - observation_date
+            - datatype
