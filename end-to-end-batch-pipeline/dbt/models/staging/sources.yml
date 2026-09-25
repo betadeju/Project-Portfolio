@@ -1,0 +1,29 @@
+version: 2
+
+sources:
+  - name: raw
+    description: >
+      Bronze layer. Raw NOAA observations loaded as-is from object storage,
+      one row per station/date/datatype reading. No transformation applied
+      here — this is the immutable, replayable source of truth.
+    schema: raw
+    tables:
+      - name: observations
+        description: Raw weather observations as returned by the NOAA API.
+        columns:
+          - name: station_id
+            description: NOAA GHCND station identifier.
+            tests:
+              - not_null
+          - name: observation_date
+            description: Date the reading was taken (not when it was ingested).
+            tests:
+              - not_null
+          - name: datatype
+            description: NOAA reading type code, e.g. TMAX, TMIN, PRCP.
+          - name: value
+            description: Raw reading value, units as returned by the API (metric).
+          - name: ingestion_date
+            description: Partition date this row was loaded under; used for idempotent reloads.
+            tests:
+              - not_null

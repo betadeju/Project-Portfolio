@@ -1,0 +1,93 @@
+version: "3.8"
+
+x-airflow-common: &airflow-common
+  image: apache/airflow:2.9.3-python3.11
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db/airflow
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    NOAA_API_TOKEN: ${NOAA_API_TOKEN}
+    STORAGE_ENDPOINT: http://minio:9000
+    STORAGE_BUCKET: ${STORAGE_BUCKET:-weather-raw}
+    STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-minioadmin}
+    STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:-minioadmin}
+    WAREHOUSE_HOST: warehouse
+    WAREHOUSE_DB: ${WAREHOUSE_DB:-weather}
+    WAREHOUSE_USER: ${WAREHOUSE_USER:-weather_user}
+    WAREHOUSE_PASSWORD: ${WAREHOUSE_PASSWORD:-change_me}
+  volumes:
+    - ./orchestration/dags:/opt/airflow/dags
+    - ./ingestion:/opt/airflow/ingestion
+    - ./dbt:/opt/airflow/dbt
+    - airflow-logs:/opt/airflow/logs
+  depends_on:
+    - airflow-db
+    - warehouse
+    - minio
+
+services:
+  # Metadata DB for Airflow itself (separate from the analytics warehouse)
+  airflow-db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow-db-data:/var/lib/postgresql/data
+
+  # Analytics warehouse (raw/staging/marts schemas live here)
+  warehouse:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${WAREHOUSE_USER:-weather_user}
+      POSTGRES_PASSWORD: ${WAREHOUSE_PASSWORD:-change_me}
+      POSTGRES_DB: ${WAREHOUSE_DB:-weather}
+    ports:
+      - "5433:5432"
+    volumes:
+      - warehouse-data:/var/lib/postgresql/data
+
+  # S3-compatible object storage standing in for the bronze layer
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        pip install -r /opt/airflow/ingestion/../requirements.txt --quiet
+        airflow db migrate
+        airflow users create --username admin --password admin \
+          --firstname admin --lastname admin --role Admin --email admin@example.com
+
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"
+    depends_on:
+      - airflow-init
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    depends_on:
+      - airflow-init
+
+volumes:
+  airflow-db-data:
+  warehouse-data:
+  minio-data:
+  airflow-logs:
