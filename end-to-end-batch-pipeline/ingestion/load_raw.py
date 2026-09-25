@@ -21,6 +21,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 CREATE_RAW_TABLE_SQL = """
+create schema if not exists raw;
+
 create table if not exists raw.observations (
     station_id text,
     observation_date date,
@@ -29,6 +31,7 @@ create table if not exists raw.observations (
     ingestion_date date
 );
 """
+
 
 UPSERT_SQL = """
 delete from raw.observations

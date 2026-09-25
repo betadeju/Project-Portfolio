@@ -6,17 +6,18 @@
 
 with bounds as (
     select
-        min(observation_date) as min_date,
-        max(observation_date) as max_date
+        min(observation_date)::timestamp as min_date,
+        max(observation_date)::timestamp as max_date
     from {{ ref('stg_observations') }}
 ),
 
 spine as (
-    {{ dbt_utils.date_spine(
-        datepart="day",
-        start_date="(select min_date from bounds)",
-        end_date="(select max_date + interval '1 day' from bounds)"
-    ) }}
+    select
+        generate_series(
+            (select min_date from bounds),
+            (select max_date + interval '1 day' from bounds),
+            interval '1 day'
+        )::date as date_day
 )
 
 select
