@@ -8,7 +8,7 @@ An end-to-end batch pipeline that ingests daily weather observations from the NO
 
 ```mermaid
 flowchart LR
-    A[NOAA API] -->|daily extract| B[Raw / Bronze<br/>S3 or MinIO]
+    A[NOAA API] -->|daily extract| B[Raw / Bronze<br/>S3 via Garage]
     B -->|dbt staging models| C[Silver<br/>cleaned & typed]
     C -->|dbt marts| D[Gold<br/>star schema]
     D --> E[BI / Analytics]
@@ -20,32 +20,27 @@ flowchart LR
     G -.validates.-> C
 ```
 
-**Flow summary:**
-1. **Extract** — Python script pulls daily station observations from the NOAA API and writes raw JSON to object storage, partitioned by `ingestion_date`.
-2. **Load (bronze)** — raw files are loaded as-is into the warehouse's raw schema, no transformation, full audit trail preserved.
-3. **Transform (silver/gold)** — dbt models clean types, deduplicate late-arriving records, and build a star schema (`fct_observations`, `dim_station`, `dim_date`).
-4. **Orchestrate** — Airflow schedules the daily run, handles retries, and supports manual backfills for any date range.
-5. **Validate** — dbt tests (uniqueness, not-null, referential integrity) and Great Expectations checks run at each layer boundary.
-
 ## Why these tools
 
 | Choice | Reasoning |
 |---|---|
-| **dbt** over raw SQL scripts | Version-controlled, testable transformations with automatic lineage tracking and documentation generation |
-| **Airflow** over cron | Retry logic, backfill support, and observability that a cron job can't give you at this scale |
-| **Bronze/silver/gold layering** | Keeps raw data immutable and replayable — if a modeling bug ships, we re-run from bronze instead of re-extracting from the source |
-| **DuckDB/Postgres locally, Snowflake/BigQuery-ready** | Cheap to develop and demo, but the dbt models are warehouse-agnostic and port to a cloud warehouse with a config change |
-| **Great Expectations** alongside dbt tests | dbt tests catch schema/relationship issues; GE catches statistical anomalies (e.g. a station reporting -200°F) |
+| **dbt** over raw SQL scripts | Version-controlled, testable transformations with automatic lineage tracking and dependency management via `dbt deps`. |
+| **Airflow** over cron | Retry logic, exponential backoff, and idempotent backfill support that a cron job can't provide at this scale. |
+| **Bronze/silver/gold layering** | Keeps raw data immutable and replayable — if a modeling bug ships, we re-run from bronze instead of re-extracting from the source. |
+| **Postgres locally, Cloud-ready** | Cheap to develop and demo, but the dbt models are warehouse-agnostic and port to a cloud warehouse with a simple config change. |
+| **Garage** over MinIO/AWS | Lightweight, distributed S3-compatible storage engine that runs locally with minimal overhead and strict API compliance. |
+
 
 ## Project structure
-
-```
 weather-pipeline/
 ├── README.md
 ├── docker-compose.yml
+├── garage.toml
+├── .gitignore
 ├── .github/workflows/ci.yml
 ├── ingestion/
 │   ├── extract.py
+│   ├── load_raw.py
 │   ├── config.py
 │   └── tests/
 ├── dbt/
@@ -54,64 +49,49 @@ weather-pipeline/
 │   │   ├── intermediate/
 │   │   └── marts/
 │   ├── tests/
+│   ├── packages.yml
 │   └── dbt_project.yml
 ├── orchestration/
 │   └── dags/weather_pipeline_dag.py
 ├── great_expectations/
 │   └── expectations/
-├── docs/
-│   └── data_model.png
 └── requirements.txt
-```
+
 
 ## How to run it
-
-```bash
-git clone https://github.com/<you>/weather-pipeline.git
+1. Clone and configure environment
+git clone [https://github.com/](https://github.com/)<you>/weather-pipeline.git
 cd weather-pipeline
-cp .env.example .env        # add your NOAA API token
-docker-compose up
-```
+cp .env.example .env        # Add your NOAA_API_TOKEN here
 
-This spins up:
-- A local Postgres/DuckDB warehouse
-- Airflow webserver + scheduler (UI at `localhost:8080`)
-- The dbt project, ready to run via `dbt run` inside the Airflow container or directly
+2. Start and initialize Garage (Object Storage)
+# Boot the storage layer
+docker compose up -d garage
 
-To trigger a manual backfill for a specific date range:
+# Assign and apply the single-node layout
+NODE_ID=$(docker compose exec garage /garage status | grep '^[a-z0-9]' | awk '{print $1}')
+docker compose exec garage /garage layout assign -z dc1 -c 1G $NODE_ID
+docker compose exec garage /garage layout apply --version 1
 
-```bash
-docker-compose exec airflow airflow dags backfill weather_pipeline \
-  --start-date 2024-01-01 --end-date 2024-01-31
-```
+# Create the bronze bucket and generate access keys
+docker compose exec garage /garage bucket create weather-raw
+docker compose exec garage /garage key create weather-key
+docker compose exec garage /garage bucket allow weather-raw --read --write --owner --key weather-key
 
-## Data model
+3. Update credentials and start the pipeline
+STORAGE_ACCESS_KEY=your_new_access_key_id
+STORAGE_SECRET_KEY=your_new_secret_access_key
+docker compose up -d
 
-`fct_observations` (grain: one row per station per day) joins to:
-- `dim_station` — station metadata, location, elevation
-- `dim_date` — standard date dimension for time-based analysis
-
-Full lineage graph is generated via `dbt docs generate` and served with `dbt docs serve`.
-
-## Data quality & idempotency
-
-- **Idempotent loads**: each run is scoped to `ingestion_date`, so re-running a date overwrites rather than duplicates (`MERGE`/upsert pattern in the silver layer).
-- **Late-arriving data**: NOAA occasionally revises prior-day readings; the pipeline re-checks the last 3 days on each run and updates changed records rather than only appending new ones.
-- **Tests on every PR**: GitHub Actions runs `dbt build` (compile + test) and Great Expectations checks against a sample dataset before merge.
-
-## What I'd change at scale
-
-- Swap the single-node ingestion script for a fan-out job (e.g. one task per station or region) to parallelize extraction once station count grows beyond a few hundred.
-- Partition the warehouse tables by `observation_date` and cluster by `station_id` to avoid full-table scans as history accumulates.
-- Move from Airflow's PostgresOperator-style loading to a bulk-load pattern (e.g. `COPY` from object storage) once raw volume exceeds what row-by-row inserts can handle.
-- Introduce a schema registry / contract check on the ingestion layer so upstream API changes fail fast in CI instead of silently breaking downstream models.
-
-## Known limitations
-
-- Currently supports a single data source (NOAA); multi-source ingestion would need a pluggable extractor interface.
-- No streaming/near-real-time path — this is a batch-only design by intent, to keep the example focused.
-- Local docker-compose setup is for development/demo only; production deployment would use managed Airflow (MWAA/Composer) and a cloud warehouse.
+4. Trigger a historical backfill
+Because the NOAA API operates on a delay, the pipeline must be backfilled to populate the warehouse with historical records.
+docker compose exec airflow-scheduler airflow dags backfill weather_pipeline \
+  --start-date 2024-01-01 --end-date 2024-01-07
 
 ## Tech stack
+Python · dbt · Airflow · PostgreSQL · Garage · Great Expectations · Docker · GitHub Actions
 
-`Python` · `dbt` · `Airflow` · `PostgreSQL` / `DuckDB` · `Great Expectations` · `Docker` · `GitHub Actions`
+## owner
+Betelhem Dejene Desta
+Data Engineer/ Platform Engineer
+betadeju@gmail.com
