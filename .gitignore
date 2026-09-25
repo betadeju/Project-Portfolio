@@ -1,0 +1,16 @@
+# Environment variables and secrets
+.env
+
+# JetBrains/IntelliJ project files
+*.iml
+.profile.iml
+.profile
+
+
+# Local data volumes and logs
+warehouse-data/
+airflow-db-data/
+airflow-logs/
+garage-data/
+garage-meta/
+logs/
