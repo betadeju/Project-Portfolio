@@ -1,16 +1,16 @@
-version: "3.8"
-
 x-airflow-common: &airflow-common
   image: apache/airflow:2.9.3-python3.11
   environment:
+    _PIP_ADDITIONAL_REQUIREMENTS: dbt-postgres
+    PYTHONPATH: /opt/airflow 
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db/airflow
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     NOAA_API_TOKEN: ${NOAA_API_TOKEN}
-    STORAGE_ENDPOINT: http://minio:9000
+    STORAGE_ENDPOINT: http://garage:3900
     STORAGE_BUCKET: ${STORAGE_BUCKET:-weather-raw}
-    STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-minioadmin}
-    STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:-minioadmin}
+    STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY}
+    STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY}
     WAREHOUSE_HOST: warehouse
     WAREHOUSE_DB: ${WAREHOUSE_DB:-weather}
     WAREHOUSE_USER: ${WAREHOUSE_USER:-weather_user}
@@ -23,7 +23,7 @@ x-airflow-common: &airflow-common
   depends_on:
     - airflow-db
     - warehouse
-    - minio
+    - garage
 
 services:
   # Metadata DB for Airflow itself (separate from the analytics warehouse)
@@ -48,18 +48,18 @@ services:
     volumes:
       - warehouse-data:/var/lib/postgresql/data
 
-  # S3-compatible object storage standing in for the bronze layer
-  minio:
-    image: minio/minio:latest
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+  # S3-compatible object storage standing in for the bronze layer (Garage)
+  garage:
+    image: dxflrs/garage:v2.4.1 
+    command: /garage server  
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "3900:3900" 
+      - "3901:3901" 
+      - "3902:3902" 
     volumes:
-      - minio-data:/data
+      - ./garage.toml:/etc/garage.toml
+      - garage-meta:/var/lib/garage/meta
+      - garage-data:/var/lib/garage/data
 
   airflow-init:
     <<: *airflow-common
@@ -89,5 +89,6 @@ services:
 volumes:
   airflow-db-data:
   warehouse-data:
-  minio-data:
+  garage-meta:
+  garage-data:
   airflow-logs:

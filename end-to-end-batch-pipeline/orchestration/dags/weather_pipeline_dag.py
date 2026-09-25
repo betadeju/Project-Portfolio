@@ -60,10 +60,12 @@ with DAG(
         task_id="dbt_build",
         bash_command=(
             "cd /opt/airflow/dbt && "
+            "dbt deps && "  
             "dbt build --profiles-dir . --target dev "
             "--vars '{\"run_date\": \"{{ ds }}\"}'"
         ),
     )
+
 
     dbt_docs_task = BashOperator(
         task_id="dbt_generate_docs",
