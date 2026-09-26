@@ -1,0 +1,14 @@
+# Copy to profiles.yml (or ~/.dbt/profiles.yml) and fill in real values.
+# Values below match the docker-compose Postgres service by default.
+weather_pipeline:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('WAREHOUSE_HOST', 'localhost') }}"
+      port: "{{ env_var('WAREHOUSE_PORT', '5432') | int }}"
+      user: "{{ env_var('WAREHOUSE_USER', 'weather_user') }}"
+      password: "{{ env_var('WAREHOUSE_PASSWORD', 'change_me') }}"
+      dbname: "{{ env_var('WAREHOUSE_DB', 'weather') }}"
+      schema: raw
+      threads: 4

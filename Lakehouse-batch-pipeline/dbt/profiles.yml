@@ -1,0 +1,22 @@
+# Copy to profiles.yml (or ~/.dbt/profiles.yml) and fill in real values.
+# Values below match the docker-compose Postgres service by default.
+weather_lakehouse:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: /tmp/duckdb.db # Transient local file, erased when container stops
+      extensions:
+        - httpfs
+        - aws
+      secrets:
+        - type: s3
+          key_id: "{{ env_var('STORAGE_ACCESS_KEY') }}"
+          secret: "{{ env_var('STORAGE_SECRET_KEY') }}"
+          # Add the replace filter here to strip the http:// prefix
+          endpoint: "{{ env_var('STORAGE_ENDPOINT') | replace('http://', '') }}"
+          region: us-east-1
+          url_style: path
+          use_ssl: false
+
+
