@@ -1,8 +1,4 @@
-{#
-  Standard date dimension, spun off the observed date range in the data
-  rather than a fixed calendar spine, so it grows automatically as new
-  dates are ingested.
-#}
+{{ config(materialized='table') }}
 
 with bounds as (
     select
@@ -12,13 +8,17 @@ with bounds as (
 ),
 
 spine as (
-    select
-        generate_series(
-            (select min_date from bounds),
-            (select max_date + interval '1 day' from bounds),
+    select 
+        unnest(generate_series(
+            min_date, 
+            max_date + interval '1 day', 
             interval '1 day'
-        )::date as date_day
+        ))::date as date_day
+    from bounds
+    -- Explicitly prevent DuckDB from generating a null sequence
+    where min_date is not null
 )
+
 select
     {{ dbt_utils.generate_surrogate_key(['date_day']) }} as date_key,
     date_day,
@@ -29,4 +29,3 @@ select
     strftime(date_day, '%A')       as day_name,
     strftime(date_day, '%B')       as month_name
 from spine
-
