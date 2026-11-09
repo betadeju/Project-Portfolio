@@ -1,0 +1,36 @@
+Python fundamentals 
+        -- Variables and data types
+        -- Functions
+        -- Error handling (AI systems fail network issues, API LIMITES , model error)
+        -- Request and Reponses are stored 
+
+Typical AI system architecture:
+ -- Frontend Layer (React) 
+            -> Capture user input
+            -> Displays AI Reponses
+            -> Handles real-time Request
+
+-- Backend Layer(Python)
+            -> Process Requests
+            -> Manges AI API calls
+            -> Handles bussiness logic
+
+-- AI layer (Gemini)
+             -> Generates Intelligen Reponses
+             -> Processes natural language
+             -> Provides AI capabilities
+        
+-- Component Integration Flow
+    User_Input -> API request -> Data Processing -> AI Innovation -> Response Handling  -> UI update
+
+-- A full Prompt contains 
+        -> The previous history (context)
+        -> The new message (User: {user_message})
+        -> A cue for the reply (Assistant:)
+
+Day 1 covered 
+        - Phase 1 :  Project Structure Creation
+        - Phase 2 :  Backend Development (Python + FastAPI)
+To cover : 
+        - Phase 3 : Frontend Development (React)
+        - Phase 4 : Testing Your Complete System
