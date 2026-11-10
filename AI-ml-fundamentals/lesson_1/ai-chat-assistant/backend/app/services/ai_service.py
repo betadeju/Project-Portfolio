@@ -1,5 +1,5 @@
 import google.generativeai as genai
-from config.setting import settings
+from config.settings import settings
 from app.models.chat import ChatMessage
 from typing import List
 import logging

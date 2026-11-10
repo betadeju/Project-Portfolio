@@ -11,7 +11,7 @@ class ChatMessage(BaseModel):
     timestamp: Optional[datetime] = None
 
 class ChatRequest(BaseModel):
-    messages: str
+    message: str
     conversation_history: Optional[List[ChatMessage]] = []
 
 class ChatResponse(BaseModel):
