@@ -13,7 +13,7 @@ async def chat(request: ChatRequest):
         if not request.message:
             raise HTTPException(status_code=400, detail="Message is required")
         logger.info(f"Received chat request: {request.message[:50]}...")  # Log only the first 50 characters for brevity
-        ai_response = ai_service.generate_reponse(
+        ai_response = ai_service.generate_response(
                 request.message,
                 request.conversation_history or []
                 )

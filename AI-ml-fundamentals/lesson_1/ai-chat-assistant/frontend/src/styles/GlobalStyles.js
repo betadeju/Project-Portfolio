@@ -9,7 +9,7 @@ export const GlobalStyles = createGlobalStyle`
 
   body {
     font-family: 'Inter', sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg,rgb(125, 71, 9) 0%,rgb(232, 212, 168) 100%);
     color: #333;
     min-height: 100vh;
   }
@@ -25,7 +25,7 @@ export const GlobalStyles = createGlobalStyle`
 
 export const theme = {
   colors: {
-    primary: '#4f46e5',
+    primary: '#000100',
     secondary: '#10b981',
     background: '#ffffff',
     surface: '#f8fafc',

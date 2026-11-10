@@ -1,68 +1,90 @@
+import logging
+from typing import List
 import google.generativeai as genai
 from config.settings import settings
 from app.models.chat import ChatMessage
-from typing import List
-import logging
-from datetime import datetime
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+SYSTEM_PROMPT = """You are Beta, a friendly and patient AI tutor who teaches Python and AI to beginners.
+- Explain ideas with simple everyday analogies before technical details.
+- Keep answers short (under 150 words) unless the user asks for more.
+- Use a warm, encouraging tone, and celebrate small wins.
+- If the user's question is unclear, ask one short clarifying question.
+- If you don't know something, say so instead of guessing."""
+
+# How many previous messages to send with each request.
+# Higher = better memory, but slower and more expensive.
+MAX_HISTORY_MESSAGES = 10
+
+
 class AIService:
     def __init__(self):
-        
         genai.configure(api_key=settings.GEMINI_API_KEY, transport="rest")
-        self.model= genai.GenerativeModel('gemini-3.5-flash-lite')
+        self.model = genai.GenerativeModel(
+            "gemini-3.5-flash-lite",
+            system_instruction=SYSTEM_PROMPT,
+        )
 
-    def generate_reponse(self, user_message: str, conversation_history: List[ChatMessage]) -> str:
-        """
-        Generate a response from the AI model based on the user's message and chat history.
-
-        Args:
-            user_message (str): The message from the user.
-            chat_history (List[ChatMessage]): The history of chat messages.
-
-        Returns:
-            str: The generated response from the AI model.
-        """
-       
-
-
-        # Generate a response using the AI model
+    def generate_response(
+        self, user_message: str, conversation_history: List[ChatMessage]
+    ) -> str:
+        """Generate a reply that takes the earlier conversation into account."""
         try:
-             # Prepare the conversation context for the AI model
-            context = self._build_context(conversation_history)
-            full_prompt = f"{context}\nUser: {user_message}\nAssitant:"
-            logger.info (f"Generating response for prompt: {user_message[:50]}...")  # Log the first 50 characters of the prompt
+            contents = self._build_contents(conversation_history, user_message)
+            logger.info(
+                f"Sending {len(contents)} messages to the model. "
+                f"Latest: {user_message[:50]}..."
+            )
+
             response = self.model.generate_content(
-                        full_prompt
-                        )
+                contents,
+                request_options={"timeout": 30},
+            )
 
-            if response and response.text:
-                return response.text.strip()
-            else:
-                return "I apologize, but I couldn't generate a response at the moment."
-        except Exception as e:
-            logger.error(f"Error generating AI response: {str(e)}")
-            return f"I'm experiencing technical difficulties: {str(e)}"
-    
-    def _build_context(self , conversation_history: List[ChatMessage]) -> str:
+            try:
+                text = response.text
+            except ValueError:
+                # Raised when the reply is empty or blocked by a safety filter
+                return "I couldn't generate a response to that. Could you rephrase?"
+
+            return text.strip() if text else "I couldn't generate a response."
+
+        except Exception:
+            logger.exception("Error generating AI response")
+            raise
+
+    def _build_contents(
+        self, conversation_history: List[ChatMessage], user_message: str
+    ) -> list:
         """
-        Build the context string from the conversation history.
-
-        Args:
-            conversation_history (List[ChatMessage]): The history of chat messages.
-
-        Returns:
-            str: The formatted context string for the AI model.
+        Turn the saved history plus the new message into Gemini's chat format:
+        [{"role": "user" | "model", "parts": ["text"]}, ...]
         """
-        if not conversation_history:
-            return "You are a helpful AI assistant. Provide clear, concise, and helpful responses."
-        context = "You are a helpful AI assistant. Here's our conversation so far:\n"
+        contents = []
 
-        for message in conversation_history[-5:]:  # Keep last 5 messages for context
-            context += f"{message.role.title()}: {message.content}\n"
-        
-        return context
-     
+        for message in conversation_history[-MAX_HISTORY_MESSAGES:]:
+            # Gemini calls the AI "model", not "assistant"
+            role = "user" if message.role == "user" else "model"
+            self._append(contents, role, message.content)
+
+        # Gemini expects the conversation to start with a user turn.
+        # The frontend's greeting ("Hello! I'm your AI assistant...") is an
+        # assistant message, so drop any leading model messages.
+        while contents and contents[0]["role"] != "user":
+            contents.pop(0)
+
+        self._append(contents, "user", user_message)
+        return contents
+
+    @staticmethod
+    def _append(contents: list, role: str, text: str) -> None:
+        """Add a message, merging it into the previous one if the role repeats."""
+        if contents and contents[-1]["role"] == role:
+            contents[-1]["parts"][0] += "\n" + text
+        else:
+            contents.append({"role": role, "parts": [text]})
+
+
 ai_service = AIService()
