@@ -10,8 +10,9 @@ logger = logging.getLogger(__name__)
 
 class AIService:
     def __init__(self):
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        self.model= genai.GenerativeModel('gemini-pro')
+        
+        genai.configure(api_key=settings.GEMINI_API_KEY, transport="rest")
+        self.model= genai.GenerativeModel('gemini-3.5-flash-lite')
 
     def generate_reponse(self, user_message: str, conversation_history: List[ChatMessage]) -> str:
         """
@@ -26,13 +27,16 @@ class AIService:
         """
        
 
+
         # Generate a response using the AI model
         try:
              # Prepare the conversation context for the AI model
             context = self._build_context(conversation_history)
             full_prompt = f"{context}\nUser: {user_message}\nAssitant:"
             logger.info (f"Generating response for prompt: {user_message[:50]}...")  # Log the first 50 characters of the prompt
-            response = self.model.generate_text(full_prompt)
+            response = self.model.generate_content(
+                        full_prompt
+                        )
 
             if response and response.text:
                 return response.text.strip()
@@ -56,7 +60,7 @@ class AIService:
             return "You are a helpful AI assistant. Provide clear, concise, and helpful responses."
         context = "You are a helpful AI assistant. Here's our conversation so far:\n"
 
-        for message in conversation_history[-5]:  # Keep last 5 messages for context
+        for message in conversation_history[-5:]:  # Keep last 5 messages for context
             context += f"{message.role.title()}: {message.content}\n"
         
         return context
