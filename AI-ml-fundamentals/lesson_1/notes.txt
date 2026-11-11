@@ -28,9 +28,32 @@ Typical AI system architecture:
         -> The new message (User: {user_message})
         -> A cue for the reply (Assistant:)
 
-Day 1 covered 
+Day 1 covered (https://aieworks.substack.com/p/day-1-python-fundamentals-for-ai)
         - Phase 1 :  Project Structure Creation
         - Phase 2 :  Backend Development (Python + FastAPI)
-To cover : 
         - Phase 3 : Frontend Development (React)
         - Phase 4 : Testing Your Complete System
+covered all the phases plus end of cousrses exercies 
+HIGHLIGHT OF THE COURSE: LEARNED HOW SYSTEM PROMT WORKS AND HOW TO WORK WITH IT IN MULTI AGENT SYSTEMS.
+                       - LEARNED ABOUT CONVERSTAION HISTORY 
+
+                
+Day 2: Variables, Data Types, and Operators - Building AI Agent Memory
+(https://aieworks.substack.com/p/day-2-variables-data-types-and-operators?r=64ai7k)
+Day two from this tutorial was helful on looking in to AI Agent Memory , which the course doesnot cover well
+it shows a small snipte to cover Variables, Data Types, and Operators which i know well so i used the moment how 
+to implement AI Agent Memory from other source , the notes will be colleceted here 
+
+What “agent memory” means
+
+Right now your assistant has only short-term memory, the recent messages that React sends each time. A fuller memory system has three layers:
+
+-> Short-term memory: the last ~20 messages, sent word for word.
+-> Summary memory: when the chat gets long, older messages are compressed into a short summary, so the AI keeps the gist without sending everything.
+-> Long-term memory: lasting facts about the user (“Name is Sam”, “Is learning Python”), which are added to every future conversation
+
+DAY 3; Control Flow - Teaching AI Systems to Make Decisions
+ 
+
+-Every AI system is fundamentally built on two types of control flow: conditional logic (if-else statements) that make decisions, and loops that process massive amounts of data.
+-- Practical example  : on how recommedations work or sentiment anaylysis works
